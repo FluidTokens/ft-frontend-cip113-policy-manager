@@ -1,4 +1,9 @@
-import CreatePolicyForm from '@/components/form/CreatePolicyForm/CreatePolicyForm';
+'use client';
+import dynamic from 'next/dynamic';
+
+const CreatePolicyForm = dynamic(() => import('@/components/form/CreatePolicyForm/CreatePolicyForm'), {
+  ssr: false,
+});
 
 function Policy() {
   return (

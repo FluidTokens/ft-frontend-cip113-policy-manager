@@ -1,4 +1,9 @@
-import MintForm from '@/components/form/MintForm/MintForm';
+'use client';
+import dynamic from 'next/dynamic';
+
+const MintForm = dynamic(() => import('@/components/form/MintForm/MintForm'), {
+  ssr: false,
+});
 
 function Mint() {
   return (

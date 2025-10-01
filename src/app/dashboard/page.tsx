@@ -1,4 +1,9 @@
-import TokensOverview from '@/components/dashboard/TokensOverview';
+'use client';
+import dynamic from 'next/dynamic';
+
+const TokensOverview = dynamic(() => import('@/components/dashboard/TokensOverview'), {
+  ssr: false,
+});
 
 function Dashboard() {
   return (
