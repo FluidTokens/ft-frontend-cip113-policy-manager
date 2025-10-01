@@ -1,0 +1,16 @@
+{
+  "css.validate": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnPaste": true,
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit"
+  },
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "i18n-ally.localesPaths": ["messages"],
+  "i18n-ally.keystyle": "nested"
+
+  // Eslint warn unused
+}
