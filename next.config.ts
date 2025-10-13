@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
     NETWORK: process.env.NETWORK,
     MAESTRO_NETWORK: process.env.MAESTRO_NETWORK,
     MAESTRO_API_KEY: process.env.MAESTRO_API_KEY,
+    AWS_CERT: process.env.AWS_CERT
   },
   reactStrictMode: false,
   eslint: {

@@ -268,6 +268,7 @@ class FluidMesh {
       await txBuilder
         .changeAddress(walletAddress)
         .selectUtxosFrom(utxos)
+        .setNetwork(maestroNetwork as 'preview' | 'mainnet')
         .complete();
 
       const unsignedTx = txBuilder.txHex;
@@ -329,6 +330,7 @@ class FluidMesh {
         .txInCollateral(collateral.txHash, collateral.outputIndex)
         .selectUtxosFrom(utxos)
         .changeAddress(walletAddress)
+        .setNetwork(maestroNetwork as 'preview' | 'mainnet')
 
 
 
@@ -612,7 +614,8 @@ class FluidMesh {
         .withdrawalPlutusScriptV3()
         .withdrawal(policyData.ruleScript.rewardAddress, "0")
         .withdrawalScript(policyData.ruleScript.scriptCbor)
-        .withdrawalRedeemerValue(mConStr1([[signerHash], [0], [0]]));
+        .withdrawalRedeemerValue(mConStr1([[signerHash], [0], [0]]))
+        .setNetwork(maestroNetwork as 'preview' | 'mainnet')
 
 
 

@@ -53,6 +53,9 @@ export default $config({
       .map(([key, value]) => `${key}:"${value}"`)
       .join(", ");
 
+
+    console.log('CERT:', envConfig.AWS_CERT)
+
     const nextjs = new sst.aws.Nextjs('Cip113PolicyManagerFrontend', {
       domain: {
         name: domainMap.get(stage),
