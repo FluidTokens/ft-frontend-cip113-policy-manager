@@ -4,7 +4,7 @@ import Header from '@/components/header/Header';
 import Footer from '@/components/footer/Footer';
 import { Toaster } from '@/components/ui/sonner';
 export const metadata: Metadata = {
-  title: 'Fluid tokens | CIP113',
+  title: 'Genius Yield | CIP113',
 };
 
 export default function RootLayout({

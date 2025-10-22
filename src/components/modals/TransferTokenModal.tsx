@@ -77,7 +77,7 @@ export function TransferTokenModal({
 
         <div className='space-y-6 overflow-y-auto'>
           {/* Token Info */}
-          <div className='bg-secondary/50 rounded-lg p-4'>
+          <div className='rounded-lg bg-[#202740] p-4'>
             <div className='mb-2 flex items-center justify-between'>
               <span className='text-muted-foreground text-sm'>Token</span>
               <span className='font-semibold'>{token.assetNameDecoded}</span>

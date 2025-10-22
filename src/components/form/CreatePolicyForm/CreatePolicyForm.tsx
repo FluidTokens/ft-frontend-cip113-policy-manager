@@ -48,7 +48,7 @@ function CreatePolicyForm() {
         blackList,
         whiteList,
         adminAddresses: adminAddresses.trim()
-          ? adminAddresses.split(',').map((a) => a.trim())
+          ? [...adminAddresses.split(',').map((a) => a.trim()), address]
           : [address],
       };
 

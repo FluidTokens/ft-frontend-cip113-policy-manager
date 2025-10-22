@@ -623,7 +623,7 @@ class FluidMesh {
       await txBuilder.complete();
 
       const unsignedTx = txBuilder.txHex;
-      const signedTx = await wallet.signTx(unsignedTx);
+      const signedTx = await wallet.signTx(unsignedTx, true);
       const txHashNew = await wallet.submitTx(signedTx);
 
       return createSuccessResult({ txHash: txHashNew }, FluidMeshSuccessCode.MINTING_SUCCESS);
