@@ -25,7 +25,7 @@ Create a new CIP-113 policy that defines the rules and governance for your token
 
 ![Create Policy Form](./public/images/create-policy-form.png)
 
-![Create Policy Form](./public/images/create-policy-form.1.png)
+![Create Policy Form](./public/images/create-policy-form-1.png)
 
 ### Smart Contract Details
 
