@@ -5,9 +5,10 @@ import { useWallet } from '@/store/walletStore';
 import { usePolicyStore } from '@/store/policyStore';
 import { getFluidMesh } from '@/lib/FluidMesh';
 import { Button } from '@/components/ui/button';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, Send, Flame } from 'lucide-react';
 import { Policy } from '@/types/general';
 import { TransferTokenModal } from '@/components/modals/TransferTokenModal';
+import { BurnTokenModal } from '@/components/modals/BurnTokenModal';
 import { toast } from 'sonner';
 import { deserializeAddress } from '@meshsdk/core';
 
@@ -40,6 +41,7 @@ function TokensOverview() {
 
   const [loading, setLoading] = useState(false);
   const [transferLoading, setTransferLoading] = useState(false);
+  const [burnLoading, setBurnLoading] = useState(false);
   const [tokensMap, setTokensMap] = useState<Map<string, PolicyTokens>>(
     new Map()
   );
@@ -47,6 +49,7 @@ function TokensOverview() {
     null
   );
   const [modalOpen, setModalOpen] = useState(false);
+  const [burnModalOpen, setBurnModalOpen] = useState(false);
 
   const fetchTokens = async () => {
     if (!address || policies.length === 0) return;
@@ -81,6 +84,14 @@ function TokensOverview() {
       fetchTokens();
     }
   }, [address, policies.length]);
+
+  // Check if current user is admin of a policy
+  const isUserAdminOfPolicy = (policy: Policy): boolean => {
+    if (!address) return false;
+    return policy.adminAddresses.some(
+      (adminAddr) => adminAddr.toLowerCase() === address.toLowerCase()
+    );
+  };
 
   // Aggregate tokens by policy and asset name
   const aggregatedTokens: AggregatedToken[] = [];
@@ -197,17 +208,49 @@ function TokensOverview() {
                 <p className='text-muted-foreground text-sm'>tokens</p>
               </div>
 
-              <Button
-                onClick={() => {
-                  setSelectedToken(token);
-                  setModalOpen(true);
-                }}
-                className='w-full'
-                size='sm'
-              >
-                <Send className='mr-2 h-4 w-4' />
-                Transfer
-              </Button>
+              <div className='grid grid-cols-2 gap-2'>
+                <Button
+                  onClick={() => {
+                    setSelectedToken(token);
+                    setModalOpen(true);
+                  }}
+                  className='w-full'
+                  size='sm'
+                  variant='default'
+                >
+                  <Send className='mr-2 h-4 w-4' />
+                  Transfer
+                </Button>
+                <div className='relative w-full'>
+                  <Button
+                    onClick={() => {
+                      if (isUserAdminOfPolicy(token.policy)) {
+                        setSelectedToken(token);
+                        setBurnModalOpen(true);
+                      }
+                    }}
+                    className='w-full'
+                    size='sm'
+                    variant='destructive'
+                    disabled={!isUserAdminOfPolicy(token.policy)}
+                    title={
+                      !isUserAdminOfPolicy(token.policy)
+                        ? 'Only policy admins can burn tokens'
+                        : undefined
+                    }
+                  >
+                    <Flame className='mr-2 h-4 w-4' />
+                    Burn
+                  </Button>
+                  {!isUserAdminOfPolicy(token.policy) && (
+                    <div className='absolute -bottom-5 left-0 right-0'>
+                      <p className='text-xs text-muted-foreground text-center'>
+                        Admin only
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -227,15 +270,15 @@ function TokensOverview() {
           try {
             const fluidMesh = getFluidMesh();
 
-            // Select UTxO to use
-            const selectedUtxo = fluidMesh.selectUtxoForTransfer(
+            // Select UTxO(s) to use
+            const selectedUtxos = fluidMesh.selectUtxoForTransfer(
               selectedToken.utxos,
               amount
             );
 
-            if (!selectedUtxo) {
+            if (!selectedUtxos) {
               toast.error(
-                'Insufficient balance in a single UTxO. Combining UTxOs is not yet supported.'
+                'Insufficient balance. Cannot find enough UTxOs for this transfer.'
               );
               return;
             }
@@ -269,8 +312,8 @@ function TokensOverview() {
               policyData,
               recipientAddress,
               amount,
-              selectedUtxo.utxo,
-              selectedUtxo.balance
+              selectedUtxos.utxos,
+              selectedUtxos.balance
             );
 
             if (!result.success) {
@@ -293,6 +336,87 @@ function TokensOverview() {
           }
         }}
         loading={transferLoading}
+      />
+
+      <BurnTokenModal
+        open={burnModalOpen}
+        onOpenChange={(open) => {
+          setBurnModalOpen(open);
+          if (!open) setSelectedToken(null);
+        }}
+        token={selectedToken}
+        onBurn={async (amount) => {
+          if (!selectedToken || !wallet || !address) return;
+
+          setBurnLoading(true);
+          try {
+            const fluidMesh = getFluidMesh();
+
+            // Select UTxO(s) to use
+            const selectedUtxos = fluidMesh.selectUtxoForTransfer(
+              selectedToken.utxos,
+              amount
+            );
+
+            if (!selectedUtxos) {
+              toast.error(
+                'Insufficient balance. Cannot find enough UTxOs for this burn.'
+              );
+              return;
+            }
+
+            // Get signer hash
+            const signerHash = deserializeAddress(address).pubKeyHash;
+
+            // Build policy data
+            const policyData = {
+              tokenName: selectedToken.policy.tokenName,
+              tokenNameHex: selectedToken.policy.tokenNameHex,
+              signerHash,
+              ruleScript: {
+                scriptCbor: selectedToken.policy.ruleScriptCbor,
+                scriptAddr: '',
+                policy: selectedToken.policy.ruleScriptPolicy,
+                rewardAddress: selectedToken.policy.ruleScriptRewardAddress,
+              },
+              smartToken: {
+                scriptCbor: selectedToken.policy.scriptCbor,
+                scriptAddr: '',
+                policy: selectedToken.policy.policyId,
+                rewardAddress: selectedToken.policy.smartTokenRewardAddress,
+              },
+              smartReceiverAddress: '',
+            };
+
+            // Burn tokens
+            const result = await fluidMesh.burnCIP113Tokens(
+              wallet,
+              policyData,
+              amount,
+              selectedUtxos.utxos,
+              selectedUtxos.balance
+            );
+
+            if (!result.success) {
+              toast.error(result.error?.userMessage || 'Burn failed');
+              return;
+            }
+
+            toast.success(`Burn successful! TxHash: ${result.data?.txHash}`);
+            setBurnModalOpen(false);
+
+            // Refresh tokens
+            await fetchTokens();
+          } catch (error) {
+            console.error('Burn error:', error);
+            toast.error(
+              `Burn failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+          } finally {
+            setBurnLoading(false);
+          }
+        }}
+        loading={burnLoading}
       />
     </div>
   );

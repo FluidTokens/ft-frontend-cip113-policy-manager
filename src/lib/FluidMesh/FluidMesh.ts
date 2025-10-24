@@ -503,33 +503,140 @@ class FluidMesh {
    * Select UTxOs for transferring CIP113 tokens
    * @param tokens - Array of token UTxOs with same asset
    * @param amount - Amount to transfer
-   * @returns Selected UTxO and remaining balance, or null if insufficient funds
+   * @returns Selected UTxOs and total balance, or null if insufficient funds
    */
   selectUtxoForTransfer(
     tokens: { quantity: string; utxoHash: string; utxoIndex: number }[],
     amount: string
-  ): { utxo: string; balance: string } | null {
+  ): { utxos: string[]; balance: string } | null {
     const amountBigInt = BigInt(amount);
 
-    // Sort tokens by quantity (largest first for simplicity)
+    // Sort tokens by quantity (largest first for efficiency)
     const sortedTokens = [...tokens].sort(
       (a, b) => Number(BigInt(b.quantity) - BigInt(a.quantity))
     );
 
-    // Find first UTxO that has enough balance
+    // First try to find a single UTxO that has enough balance
     for (const token of sortedTokens) {
       const balance = BigInt(token.quantity);
       if (balance >= amountBigInt) {
         return {
-          utxo: `${token.utxoHash}#${token.utxoIndex}`,
+          utxos: [`${token.utxoHash}#${token.utxoIndex}`],
           balance: token.quantity,
         };
       }
     }
 
-    // If no single UTxO has enough, we would need to combine multiple UTxOs
-    // For now, return null (not supported yet)
+    // If no single UTxO has enough, combine multiple UTxOs
+    const selectedUtxos: string[] = [];
+    let totalBalance = BigInt(0);
+
+    for (const token of sortedTokens) {
+      selectedUtxos.push(`${token.utxoHash}#${token.utxoIndex}`);
+      totalBalance += BigInt(token.quantity);
+
+      if (totalBalance >= amountBigInt) {
+        return {
+          utxos: selectedUtxos,
+          balance: totalBalance.toString(),
+        };
+      }
+    }
+
+    // Insufficient funds
     return null;
+  }
+
+  /**
+   * Burn CIP113 tokens
+   * @param wallet - Browser wallet for signing
+   * @param policyData - Policy data
+   * @param amount - Amount to burn
+   * @param utxosToSpend - UTxOs containing the tokens (array of txHash#index format)
+   * @param currentBalance - Current total balance in the UTxOs
+   */
+  async burnCIP113Tokens(
+    wallet: BrowserWallet,
+    policyData: Cip113PolicyData,
+    amount: string,
+    utxosToSpend: string[],
+    currentBalance: string
+  ): Promise<FluidMeshResult<{ txHash: string }>> {
+    try {
+      const walletAddress = await wallet.getChangeAddress();
+      const utxos = await wallet.getUtxos();
+      const signerHash = deserializeAddress(walletAddress).pubKeyHash;
+      const collateral = await getCollateral(wallet, walletAddress);
+
+      // Calculate change if needed
+      const changeAmount = BigInt(currentBalance) - BigInt(amount);
+      const senderSmartAddress = this.getSmartReceiverAddress(
+        policyData.smartToken.scriptCbor,
+        signerHash,
+        false
+      );
+
+      const txBuilder = this.getTxBuilder();
+
+      // Add all input UTxOs
+      for (const utxoToSpend of utxosToSpend) {
+        const [txHash, indexStr] = utxoToSpend.split("#");
+        const index = parseInt(indexStr, 10);
+
+        txBuilder
+          .spendingPlutusScript("V3")
+          .txIn(txHash, index)
+          .txInInlineDatumPresent()
+          .txInScript(policyData.smartToken.scriptCbor)
+          .txInRedeemerValue(mConStr0([]));
+      }
+
+      // Add change output if there's remaining balance
+      if (changeAmount > 0) {
+        txBuilder.txOut(senderSmartAddress, [
+          {
+            unit: policyData.smartToken.policy + policyData.tokenNameHex,
+            quantity: changeAmount.toString(),
+          },
+        ]);
+      }
+
+      // Burn tokens (negative mint)
+      txBuilder
+        .mintPlutusScriptV3()
+        .mint(
+          `-${amount}`,
+          policyData.smartToken.policy,
+          policyData.tokenNameHex
+        )
+        .mintingScript(policyData.smartToken.scriptCbor)
+        .mintRedeemerValue(mConStr0(["burn"]))
+        .requiredSignerHash(signerHash)
+        .withdrawalPlutusScriptV3()
+        .withdrawal(policyData.smartToken.rewardAddress, "0")
+        .withdrawalScript(policyData.smartToken.scriptCbor)
+        .withdrawalRedeemerValue(mConStr0([]))
+        .withdrawalPlutusScriptV3()
+        .withdrawal(policyData.ruleScript.rewardAddress, "0")
+        .withdrawalScript(policyData.ruleScript.scriptCbor)
+        .withdrawalRedeemerValue(mConStr0([]))
+        .changeAddress(walletAddress)
+        .selectUtxosFrom(utxos)
+        .txInCollateral(collateral.txHash, collateral.outputIndex)
+        .setNetwork(maestroNetwork as 'preview' | 'mainnet');
+
+      await txBuilder.complete();
+
+      const unsignedTx = txBuilder.txHex;
+      const signedTx = await wallet.signTx(unsignedTx, true);
+      const txHashNew = await wallet.submitTx(signedTx);
+
+      return createSuccessResult({ txHash: txHashNew }, FluidMeshSuccessCode.MINTING_SUCCESS);
+    } catch (error) {
+      console.error("Error burning CIP113 tokens:", error);
+      const fluidError = FluidMeshError.fromError(error);
+      return createErrorResult(fluidError);
+    }
   }
 
   /**
@@ -538,8 +645,8 @@ class FluidMesh {
    * @param policyData - Policy data
    * @param recipientAddress - Recipient's Cardano address
    * @param amount - Amount to transfer
-   * @param utxoToSpend - UTxO containing the tokens (txHash#index format)
-   * @param currentBalance - Current balance in the UTxO
+   * @param utxosToSpend - UTxOs containing the tokens (array of txHash#index format)
+   * @param currentBalance - Current total balance in the UTxOs
    * @param collateralUtxo - Collateral UTxO (txHash#index format)
    */
   async transferCIP113Tokens(
@@ -547,7 +654,7 @@ class FluidMesh {
     policyData: Cip113PolicyData,
     recipientAddress: string,
     amount: string,
-    utxoToSpend: string,
+    utxosToSpend: string[],
     currentBalance: string
   ): Promise<FluidMeshResult<{ txHash: string }>> {
     try {
@@ -574,23 +681,26 @@ class FluidMesh {
 
       const txBuilder = this.getTxBuilder();
 
-      // Parse UTxO
-      const [txHash, indexStr] = utxoToSpend.split("#");
-      const index = parseInt(indexStr, 10);
+      // Add all input UTxOs
+      for (const utxoToSpend of utxosToSpend) {
+        const [txHash, indexStr] = utxoToSpend.split("#");
+        const index = parseInt(indexStr, 10);
 
-      // Build transaction
-      txBuilder
-        .spendingPlutusScript("V3")
-        .txIn(txHash, index)
-        .txInInlineDatumPresent()
-        .txInScript(policyData.smartToken.scriptCbor)
-        .txInRedeemerValue(mConStr0([]))
-        .txOut(recipientSmartAddress, [
-          {
-            unit: policyData.smartToken.policy + policyData.tokenNameHex,
-            quantity: amount,
-          },
-        ]);
+        txBuilder
+          .spendingPlutusScript("V3")
+          .txIn(txHash, index)
+          .txInInlineDatumPresent()
+          .txInScript(policyData.smartToken.scriptCbor)
+          .txInRedeemerValue(mConStr0([]));
+      }
+
+      // Add output to recipient
+      txBuilder.txOut(recipientSmartAddress, [
+        {
+          unit: policyData.smartToken.policy + policyData.tokenNameHex,
+          quantity: amount,
+        },
+      ]);
 
       // Add change output if there's remaining balance
       if (changeAmount > 0) {
