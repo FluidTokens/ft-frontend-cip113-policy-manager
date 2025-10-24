@@ -149,9 +149,79 @@ Transaction URL: https://preview.cexplorer.io/tx/418731ff5e281ce158991cd47cf607b
 
 ---
 
+## 4. Burn Tokens
+
+Permanently destroy CIP-113 tokens. **Only policy administrators can burn tokens.**
+
+### Form Fields
+
+- **Amount\*** (required): Quantity to burn (must be > 0 and ≤ available balance)
+
+The modal automatically displays:
+
+- Current token balance
+- Token name and policy information
+- Warning message about irreversible action
+- Admin-only operation notice
+
+![Burn Token Button](./public/images/burn-token-button.png)
+
+![Burn Token Button](./public/images/burn-token-button-1.png)
+
+### Access Control
+
+**Important**: The burn operation is restricted to policy administrators only.
+
+- The burn button is **disabled** for non-admin users
+- Only addresses listed in the policy's `adminAddresses` can execute burns
+- This ensures controlled token supply management
+
+### Smart Contract Details
+
+Token burning is implemented as negative minting:
+
+- **Smart Token Script**: Validates burn redeemer (`ConStr0(["burn"])`) and rule compliance
+- **Rule Script**: Verifies admin signature and enforces governance rules
+- **Minting Amount**: Negative value (e.g., `-100` to burn 100 tokens)
+
+The transaction spends UTxOs from the admin's smart receiver address and burns the specified amount.
+
+### Transaction Flow
+
+1. Admin user specifies amount to burn
+2. System validates user is in policy's admin list
+3. System selects appropriate UTxO(s) containing tokens
+4. Transaction builds:
+   - Spending input: UTxO(s) from admin's smart receiver address
+   - Negative mint: Burns specified token quantity
+   - Change output (if applicable): Remaining tokens back to admin's smart receiver address
+   - Withdrawals from both smart token and rule scripts (0 ADA each)
+   - Required signer: admin's public key hash
+5. Transaction is signed and submitted
+6. Tokens are permanently removed from circulation
+
+**Example Transaction:**
+
+```
+Transaction URL: https://preview.cexplorer.io/tx/95921989c3255ed28698f6dcc6ef27f5dee448bce714f9ee98c373ca181bce29
+```
+
+### Important Notes
+
+- **Irreversible**: Burned tokens cannot be recovered
+- **Admin Only**: Only policy admins can execute burn transactions
+- **Supply Reduction**: Burning permanently reduces total token supply
+- **Change Handling**: If burning partial balance, change is returned to admin's smart receiver address
+
+---
+
 ## Technical Notes
 
 - **Script Addresses**: All CIP-113 tokens are held in script addresses (smart receiver addresses), not regular wallet addresses
 - **Collateral**: Transactions involving smart contracts require collateral UTxOs
 - **Plutus Version**: All scripts are Plutus V3
-- **Redeemers**: Minting uses `ConStr0`, transfers use `ConStr0` for token script and `ConStr1` for rule validation
+- **Redeemers**:
+  - Minting uses `ConStr0(["mesh"])`
+  - Burning uses `ConStr0(["burn"])`
+  - Transfers use `ConStr0([])` for token script and `ConStr1([[signerHash], [0], [0]])` for rule validation
+  - Spending from smart addresses uses `ConStr0([])`
