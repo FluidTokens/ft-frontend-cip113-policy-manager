@@ -11,6 +11,7 @@ import {
   mConStr0,
   mConStr1,
   PlutusScript,
+  deserializeDatum,
 } from "@meshsdk/core";
 import { applyParamsToScript } from "@meshsdk/core-csl";
 import blueprint from "@/config/plutus.json";
@@ -24,6 +25,7 @@ import {
   createErrorResult,
 } from "./errors";
 import { getCollateral } from "@/lib/FluidMesh/utils";
+import { FragmaMintMetadataInput, FragmaRwaMintMetadata } from "@/types/general";
 
 /**
  * FluidMesh class - Manages blockchain interactions for CIP113 policies
@@ -297,6 +299,8 @@ class FluidMesh {
     wallet: BrowserWallet,
     policyData: Cip113PolicyData,
     quantity: string,
+    metadata: FragmaMintMetadataInput
+
   ): Promise<FluidMeshResult<{ txHash: string }>> {
     try {
       const utxos = await wallet.getUtxos();
@@ -305,6 +309,28 @@ class FluidMesh {
       const txBuilder = this.getTxBuilder();
 
       const collateral = await getCollateral(wallet, walletAddress)
+
+      const rwaMetadata: FragmaRwaMintMetadata['777'] = {
+        fragma_rwa_v1: {
+          policy: policyData.smartToken.policy,
+          assetName: policyData.tokenNameHex,
+          rule_script_policy_hash: policyData.ruleScript.policy, // Preso dalla policy
+          asset_ref_id: metadata.asset_ref_id,
+          attestation_sha256: metadata.attestation_sha256,
+          mapping: metadata.mapping,
+          tokenomics: {
+            total_supply: Number(quantity),
+            decimals: 1,
+            minting_policy_hash: policyData.smartToken.policy,
+            admin_pkh: metadata.admin_pkh.map(
+              (addr) => deserializeAddress(addr).pubKeyHash
+            ),
+            initial_allocations: metadata.initial_allocations
+          }
+        }
+      };
+
+      console.log(rwaMetadata)
 
       // Build transaction
       txBuilder
@@ -321,6 +347,7 @@ class FluidMesh {
           policyData.smartToken.policy,
           policyData.tokenNameHex
         )
+        .metadataValue(777, rwaMetadata)
         .mintingScript(policyData.smartToken.scriptCbor)
         .mintRedeemerValue(mConStr0(["mesh"]))
         .withdrawalPlutusScriptV3()
@@ -351,49 +378,7 @@ class FluidMesh {
     }
   }
 
-  /**
-   * Create and mint a CIP113 policy in one call
-   * This is a convenience method that combines createPolicyData and mintPolicy
-   */
-  async createAndMintPolicy(
-    wallet: BrowserWallet,
-    config: Cip113PolicyConfig,
-    quantity: string = "1",
-  ): Promise<FluidMeshResult<PolicyCreationResult>> {
-    try {
-      const walletAddress = await wallet.getChangeAddress();
 
-      // Create policy data
-      const policyData = await this.createPolicyData(config, walletAddress);
-
-      // Mint tokens
-      const mintResult = await this.mintPolicy(
-        wallet,
-        policyData,
-        quantity,
-
-      );
-
-      if (!mintResult.success) {
-        return createErrorResult(mintResult.error!);
-      }
-
-      return createSuccessResult(
-        {
-          policyId: policyData.smartToken.policy,
-          tokenName: config.tokenName,
-          scriptCbor: policyData.smartToken.scriptCbor,
-          txHash: mintResult.data?.txHash,
-          policyData,
-        },
-        FluidMeshSuccessCode.MINTING_SUCCESS
-      );
-    } catch (error) {
-      console.error("Error creating and minting policy:", error);
-      const fluidError = FluidMeshError.fromError(error);
-      return createErrorResult(fluidError);
-    }
-  }
 
   /**
    * Convert hex asset name to UTF-8 string
@@ -416,11 +401,11 @@ class FluidMesh {
    */
   async getCIP113TokensForAddress(
     smartReceiverAddress: string
-  ): Promise<FluidMeshResult<{ unit: string; quantity: string; policyId: string; assetName: string; assetNameDecoded: string; utxoHash: string; utxoIndex: number }[]>> {
+  ): Promise<FluidMeshResult<{ unit: string; quantity: string; policyId: string; assetName: string; assetNameDecoded: string; utxoHash: string; utxoIndex: number, metadata?: string }[]>> {
     try {
       const utxos = await this.blockchainProvider.fetchAddressUTxOs(smartReceiverAddress);
 
-      const tokens: { unit: string; quantity: string; policyId: string; assetName: string; assetNameDecoded: string; utxoHash: string; utxoIndex: number }[] = [];
+      const tokens: { unit: string; quantity: string; policyId: string; assetName: string; assetNameDecoded: string; utxoHash: string; utxoIndex: number, metadata?: string }[] = [];
 
       for (const utxo of utxos) {
         for (const asset of utxo.output.amount) {
@@ -439,6 +424,7 @@ class FluidMesh {
             assetNameDecoded: this.hexToString(assetName),
             utxoHash: utxo.input.txHash,
             utxoIndex: utxo.input.outputIndex,
+
           });
         }
       }
