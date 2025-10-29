@@ -61,14 +61,11 @@ Mint tokens under an existing policy. Only admin addresses can mint tokens.
 
 - **Selected Policy\*** (required): Choose from policies where you are an admin
 - **Quantity\*** (required): Amount of tokens to mint (must be > 0)
-
-![Mint Token Form](./public/images/mint-token-form.png)
+- **Metadata**: Add metadata information
 
 ![Mint Token Form](./public/images/mint-token-form-1.png)
-
+![Mint Token Form](./public/images/mint-token-form.png)
 ![Mint Token Form](./public/images/mint-token-form-2.png)
-
-![Mint Token Form](./public/images/mint-token-form-3.png)
 
 ### Smart Contract Details
 
