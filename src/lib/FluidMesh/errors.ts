@@ -25,6 +25,11 @@ export enum FluidMeshErrorCode {
   INVALID_TOKEN_NAME = 'INVALID_TOKEN_NAME',
   INVALID_CONFIGURATION = 'INVALID_CONFIGURATION',
 
+  // Allocation errors
+  INVALID_ALLOCATION = 'INVALID_ALLOCATION',
+  ALLOCATIONS_EXCEED_TOTAL = 'ALLOCATIONS_EXCEED_TOTAL',
+  DUPLICATE_RECIPIENT = 'DUPLICATE_RECIPIENT',
+
   // Network errors
   NETWORK_ERROR = 'NETWORK_ERROR',
   PROVIDER_ERROR = 'PROVIDER_ERROR',
@@ -64,6 +69,12 @@ export const ERROR_MESSAGES: Record<FluidMeshErrorCode, string> = {
     'Invalid token name. Use only alphanumeric characters',
   [FluidMeshErrorCode.INVALID_CONFIGURATION]:
     'Invalid configuration. Check the input parameters',
+  [FluidMeshErrorCode.INVALID_ALLOCATION]:
+    'Invalid allocation. Check recipient addresses and quantities',
+  [FluidMeshErrorCode.ALLOCATIONS_EXCEED_TOTAL]:
+    'Total allocations exceed minting quantity',
+  [FluidMeshErrorCode.DUPLICATE_RECIPIENT]:
+    'Duplicate recipient addresses found',
   [FluidMeshErrorCode.NETWORK_ERROR]:
     'Network error. Please check your internet connection',
   [FluidMeshErrorCode.PROVIDER_ERROR]:
@@ -167,6 +178,14 @@ export class FluidMeshError extends Error {
     if (lowerMessage.includes('invalid address')) {
       return new FluidMeshError(
         FluidMeshErrorCode.INVALID_ADDRESS,
+        undefined,
+        error
+      );
+    }
+
+    if (lowerMessage.includes('allocation') || lowerMessage.includes('recipient')) {
+      return new FluidMeshError(
+        FluidMeshErrorCode.INVALID_ALLOCATION,
         undefined,
         error
       );

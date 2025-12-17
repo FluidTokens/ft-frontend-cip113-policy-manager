@@ -293,14 +293,15 @@ class FluidMesh {
    * @param wallet - Browser wallet for signing
    * @param policyData - Policy data from createPolicyData
    * @param quantity - Amount to mint
-   * @param collateralUtxo - Collateral UTxO (txHash#index format)
+   * @param metadata - Metadata for the mint
+   * @param recipientAllocations - Optional allocations to mint directly to recipients
    */
   async mintPolicy(
     wallet: BrowserWallet,
     policyData: Cip113PolicyData,
     quantity: string,
-    metadata: FragmaMintMetadataInput
-
+    metadata: FragmaMintMetadataInput,
+    recipientAllocations?: { address: string; quantity: string }[]
   ): Promise<FluidMeshResult<{ txHash: string }>> {
     try {
       const utxos = await wallet.getUtxos();
@@ -309,6 +310,58 @@ class FluidMesh {
       const txBuilder = this.getTxBuilder();
 
       const collateral = await getCollateral(wallet, walletAddress)
+
+      // Calculate allocations and remaining
+      const allocations = recipientAllocations && recipientAllocations.length > 0
+        ? recipientAllocations
+        : null;
+
+      // Calculate total allocated to recipients
+      const totalAllocated = allocations
+        ? allocations.reduce((acc, curr) => acc + BigInt(curr.quantity), BigInt(0))
+        : BigInt(0);
+
+      // Remaining goes to minter (signerHash)
+      const remainingForMinter = BigInt(quantity) - totalAllocated;
+
+      // Validate allocations don't exceed total
+      if (totalAllocated > BigInt(quantity)) {
+        throw new Error('Total allocations exceed minting quantity');
+      }
+
+      // Build accurate initial_allocations for metadata
+      const initialAllocations: Array<{
+        label: string;
+        address: string[];
+        amount: number;
+      }> = [];
+
+      // Add each recipient
+      if (allocations) {
+        for (const allocation of allocations) {
+          const recipientHash = deserializeAddress(allocation.address).pubKeyHash;
+          const recipientSmartAddress = this.getSmartReceiverAddress(
+            policyData.smartToken.scriptCbor,
+            recipientHash,
+            false
+          );
+
+          initialAllocations.push({
+            label: `Allocation to ${allocation.address.slice(0, 10)}...`,
+            address: recipientSmartAddress.match(/.{1,64}/g) || [],
+            amount: parseInt(allocation.quantity),
+          });
+        }
+      }
+
+      // Add minter if remaining
+      if (remainingForMinter > 0) {
+        initialAllocations.push({
+          label: 'Minter allocation',
+          address: policyData.smartReceiverAddress.match(/.{1,64}/g) || [],
+          amount: parseInt(remainingForMinter.toString()),
+        });
+      }
 
       const rwaMetadata: FragmaRwaMintMetadata['777'] = {
         fragma_rwa_v1: {
@@ -325,7 +378,7 @@ class FluidMesh {
             admin_pkh: metadata.admin_pkh.map(
               (addr) => deserializeAddress(addr).pubKeyHash
             ),
-            initial_allocations: metadata.initial_allocations
+            initial_allocations: initialAllocations
           }
         }
       };
@@ -333,14 +386,36 @@ class FluidMesh {
       console.log(rwaMetadata)
 
       // Build transaction
-      txBuilder
-        .txOut(policyData.smartReceiverAddress, [
+      // Mint to each recipient's smart receiver address
+      if (allocations) {
+        for (const allocation of allocations) {
+          const recipientHash = deserializeAddress(allocation.address).pubKeyHash;
+          const recipientSmartAddress = this.getSmartReceiverAddress(
+            policyData.smartToken.scriptCbor,
+            recipientHash,
+            false
+          );
+
+          txBuilder.txOut(recipientSmartAddress, [
+            {
+              unit: policyData.smartToken.policy + policyData.tokenNameHex,
+              quantity: allocation.quantity,
+            },
+          ]);
+        }
+      }
+
+      // Mint remaining to minter's smart receiver address
+      if (remainingForMinter > 0) {
+        txBuilder.txOut(policyData.smartReceiverAddress, [
           {
             unit: policyData.smartToken.policy + policyData.tokenNameHex,
-            quantity: quantity,
+            quantity: remainingForMinter.toString(),
           },
-        ])
-        .requiredSignerHash(policyData.signerHash)
+        ]);
+      }
+
+      txBuilder.requiredSignerHash(policyData.signerHash)
         .mintPlutusScriptV3()
         .mint(
           quantity,

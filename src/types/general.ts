@@ -103,6 +103,52 @@ export interface FragmaMintMetadataInput {
   mapping?: FragmaRwaMapping;
 }
 
+// --- 6. Multi-Recipient Minting (Feature 1) ---
+
+/** Allocation entry for multi-recipient minting */
+export interface RecipientAllocation {
+  /** Cardano address (addr1... or addr_test...) */
+  address: string;
+  /** Amount to mint to this recipient */
+  quantity: string;
+}
+
+// --- 7. Claim List Management (Feature 2 - UI/localStorage only) ---
+
+/** Individual claim entry in a claim list */
+export interface ClaimEntry {
+  /** Unique identifier for this claim entry */
+  id: string;
+  /** Cardano address eligible to claim */
+  address: string;
+  /** Maximum tokens this address can claim */
+  maxClaimable: string;
+}
+
+/** Complete claim list associated with a mint operation */
+export interface ClaimList {
+  /** Unique identifier for this claim list */
+  id: string;
+  /** Associated policy ID */
+  policyId: string;
+  /** Transaction hash of the mint operation */
+  mintTxHash: string;
+  /** Total tokens available in claim pool */
+  totalClaimPool: string;
+  /** Individual claim entries */
+  claims: ClaimEntry[];
+  /** ISO timestamp when created */
+  createdAt: string;
+  /** Address that created the claim list */
+  createdBy: string;
+}
+
+/** Validation result helper */
+export interface ValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
 export type {
   FragmaRwaMintMetadata,
   FragmaRwaV1,
