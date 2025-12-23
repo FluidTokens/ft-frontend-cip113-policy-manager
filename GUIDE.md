@@ -142,8 +142,29 @@ Before minting, ensure you have:
 2. ✅ Finalized your Token-ownership-Mapping.pdf document
 3. ✅ Computed the SHA-256 hash → set `attestation_sha256`
 4. ✅ Confirmed the deployed Rule Script hash
-5. ✅ (Optional) Uploaded mapping document to IPFS and/or HTTPS hosting
-6. ✅ (Optional) Generated and uploaded detached signature file
+5. ✅ (Optional) Generated and uploaded detached signature file
+
+### Minting with Initial Allocations
+
+During the minting process, you can optionally distribute tokens directly to a list of recipients. This is useful for:
+
+- **Airdrops**: Distributing tokens to a predefined list of wallets
+- **Team/Investor Allocations**: Sending tokens to specific stakeholders at generation time
+
+To use this feature:
+
+1.  Prepare a CSV or list of addresses and amounts
+2.  Input them into the "Initial Allocations" section of the mint form
+3.  The system will generate outputs for each recipient in the mint transaction
+4.  The remaining balance (Total Supply - Allocations) will be sent to your admin wallet
+
+### Setting up a Claim List
+
+You can also create a **Claim List** during minting. This allows users to claim tokens later rather than receiving them immediately.
+
+1.  Enable "Create Claim List" in the mint form
+2.  Upload a list of eligible addresses and their maximum claimable amounts
+3.  These users will see their eligibility in the "My Claimable Tokens" dashboard
 
 ### Smart Contract Details
 
@@ -316,4 +337,37 @@ Transaction URL: https://preview.cexplorer.io/tx/95921989c3255ed28698f6dcc6ef27f
   - Minting uses `ConStr0(["mesh"])`
   - Burning uses `ConStr0(["burn"])`
   - Transfers use `ConStr0([])` for token script and `ConStr1([[signerHash], [0], [0]])` for rule validation
-  - Spending from smart addresses uses `ConStr0([])`
+- Spending from smart addresses uses `ConStr0([])`
+
+---
+
+## 5. Claim Tokens
+
+Users can check their eligibility for token claims in the "My Claimable Tokens" dashboard.
+
+### Claiming Process
+
+1.  Navigate to the "Claimable" tab in the dashboard
+2.  If you were included in a claim list, you will see your eligible tokens
+3.  Click "Claim" to initiate the transaction
+
+![Claimable Tokens](./public/images/claimable-tokens.png)
+
+```
+Transaction URL: https://preview.cexplorer.io/tx/130dcb8caaab71142e3f716344a724ba8e9d426184851af69b47598de7ddf59e
+```
+
+---
+
+## 6. Send Rewards
+
+Admins can distribute tokens as rewards without the ability to burn them in this view.
+
+1.  Navigate to "Send Rewards" tab in the dashboard
+2.  Select a token to distribute
+3.  Use the "Send Rewards" button
+4.  The "Burn" option is hidden in this view to prevent accidental destruction of assets
+
+```
+Transaction URL: https://preview.cexplorer.io/tx/b98a1196b54d1a6f0c68181fba870fb6eeaff4a1c677a8f4b1e95f6c74056684
+```

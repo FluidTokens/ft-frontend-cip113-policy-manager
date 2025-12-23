@@ -37,11 +37,16 @@ function Dashboard() {
       <Tabs defaultValue='tokens' className='w-full'>
         <TabsList className='w-full max-w-[600px]'>
           <TabsTrigger value='tokens'>My Tokens</TabsTrigger>
+          <TabsTrigger value='rewards'>Send Rewards</TabsTrigger>
           <TabsTrigger value='claimable'>Claimable</TabsTrigger>
         </TabsList>
 
         <TabsContent value='tokens' className='mt-6'>
           <TokensOverview />
+        </TabsContent>
+
+        <TabsContent value='rewards' className='mt-6'>
+          <TokensOverview allowBurn={false} />
         </TabsContent>
 
         <TabsContent value='claimable' className='mt-6'>

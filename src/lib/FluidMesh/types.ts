@@ -1,4 +1,4 @@
-import { Asset, PlutusScript } from "@meshsdk/core";
+import { Asset, PlutusScript } from '@meshsdk/core';
 
 /**
  * CIP113 Policy configuration
@@ -76,4 +76,12 @@ export interface MintTransactionParams {
 export interface TransactionBuildResult {
   unsignedTx: string;
   txHash: string;
+}
+
+/**
+ * Recipient structure for transfers
+ */
+export interface Recipient {
+  address: string;
+  amount: string;
 }

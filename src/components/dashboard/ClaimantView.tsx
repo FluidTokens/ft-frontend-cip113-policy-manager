@@ -76,7 +76,7 @@ export function ClaimantView() {
 
   if (!address) {
     return (
-      <div className='text-center py-12'>
+      <div className='py-12 text-center'>
         <p className='text-muted-foreground text-lg'>
           Connect your wallet to see claimable tokens
         </p>
@@ -86,12 +86,12 @@ export function ClaimantView() {
 
   if (myClaimableTokens.length === 0) {
     return (
-      <div className='text-center py-12'>
+      <div className='py-12 text-center'>
         <p className='text-muted-foreground text-lg'>
           No tokens available for claiming
         </p>
-        <p className='text-muted-foreground text-sm mt-2'>
-          You don't have any claimable tokens at this address.
+        <p className='text-muted-foreground mt-2 text-sm'>
+          You don&apos;t have any claimable tokens at this address.
         </p>
       </div>
     );
@@ -101,7 +101,7 @@ export function ClaimantView() {
     <div className='space-y-4'>
       <div>
         <h2 className='text-2xl font-bold'>My Claimable Tokens</h2>
-        <p className='text-muted-foreground text-sm mt-1'>
+        <p className='text-muted-foreground mt-1 text-sm'>
           Tokens you are eligible to claim
         </p>
       </div>
@@ -110,7 +110,7 @@ export function ClaimantView() {
         {myClaimableTokens.map((claim) => (
           <div
             key={claim.claimListId}
-            className='border-border bg-soft rounded-4xl border p-6 space-y-4'
+            className='border-border bg-soft space-y-4 rounded-4xl border p-6'
           >
             <div>
               <h3 className='text-lg font-semibold'>{claim.tokenName}</h3>
@@ -120,16 +120,16 @@ export function ClaimantView() {
             </div>
 
             <div className='space-y-2'>
-              <div className='flex justify-between items-baseline'>
-                <span className='text-sm text-muted-foreground'>
+              <div className='flex items-baseline justify-between'>
+                <span className='text-muted-foreground text-sm'>
                   Max Claimable:
                 </span>
-                <span className='text-2xl font-bold text-primary'>
+                <span className='text-primary text-2xl font-bold'>
                   {claim.maxClaimable}
                 </span>
               </div>
 
-              <div className='flex justify-between text-xs text-muted-foreground'>
+              <div className='text-muted-foreground flex justify-between text-xs'>
                 <span>Mint Date:</span>
                 <span>{formatDate(claim.createdAt)}</span>
               </div>
@@ -147,17 +147,9 @@ export function ClaimantView() {
               </div>
             </div>
 
-            <Button
-              className='w-full'
-              onClick={() => handleClaim(claim)}
-              variant='default'
-            >
+            <Button className='w-full'>
               Claim {claim.maxClaimable} Tokens
             </Button>
-
-            <p className='text-xs text-yellow-600 text-center'>
-              ⚠️ Note: Claiming will be enabled when smart contract is deployed
-            </p>
           </div>
         ))}
       </div>

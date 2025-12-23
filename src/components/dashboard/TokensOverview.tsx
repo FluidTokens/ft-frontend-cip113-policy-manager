@@ -35,7 +35,7 @@ type PolicyTokens = {
   tokenName: string;
 };
 
-function TokensOverview() {
+function TokensOverview({ allowBurn = true }: { allowBurn?: boolean }) {
   const { wallet, address } = useWallet();
   const { policies } = usePolicyStore();
 
@@ -101,7 +101,10 @@ function TokensOverview() {
 
     const tokensByAsset = new Map<
       string,
-      { total: bigint; utxos: { quantity: string; utxoHash: string; utxoIndex: number }[] }
+      {
+        total: bigint;
+        utxos: { quantity: string; utxoHash: string; utxoIndex: number }[];
+      }
     >();
 
     policyData.tokens.forEach((token) => {
@@ -160,7 +163,9 @@ function TokensOverview() {
   return (
     <div className='border-border bg-soft rounded-4xl border p-6'>
       <div className='mb-4 flex items-center justify-between'>
-        <h2 className='text-2xl font-bold'>Your CIP113 Tokens</h2>
+        <h2 className='text-2xl font-bold'>
+          {!allowBurn ? 'Send Rewards' : 'Your CIP113 Tokens'}
+        </h2>
         <Button
           onClick={fetchTokens}
           disabled={loading}
@@ -198,7 +203,7 @@ function TokensOverview() {
                 <p className='text-muted-foreground text-sm'>
                   {token.policy.tokenName}
                 </p>
-                <p className='text-muted-foreground mt-1 text-xs font-mono'>
+                <p className='text-muted-foreground mt-1 font-mono text-xs'>
                   {token.policyId.slice(0, 16)}...
                 </p>
               </div>
@@ -208,7 +213,9 @@ function TokensOverview() {
                 <p className='text-muted-foreground text-sm'>tokens</p>
               </div>
 
-              <div className='grid grid-cols-2 gap-2'>
+              <div
+                className={`grid ${allowBurn ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}
+              >
                 <Button
                   onClick={() => {
                     setSelectedToken(token);
@@ -219,37 +226,39 @@ function TokensOverview() {
                   variant='default'
                 >
                   <Send className='mr-2 h-4 w-4' />
-                  Transfer
+                  {allowBurn ? 'Transfer' : 'Send Rewards'}
                 </Button>
-                <div className='relative w-full'>
-                  <Button
-                    onClick={() => {
-                      if (isUserAdminOfPolicy(token.policy)) {
-                        setSelectedToken(token);
-                        setBurnModalOpen(true);
+                {allowBurn && (
+                  <div className='relative w-full'>
+                    <Button
+                      onClick={() => {
+                        if (isUserAdminOfPolicy(token.policy)) {
+                          setSelectedToken(token);
+                          setBurnModalOpen(true);
+                        }
+                      }}
+                      className='w-full'
+                      size='sm'
+                      variant='destructive'
+                      disabled={!isUserAdminOfPolicy(token.policy)}
+                      title={
+                        !isUserAdminOfPolicy(token.policy)
+                          ? 'Only policy admins can burn tokens'
+                          : undefined
                       }
-                    }}
-                    className='w-full'
-                    size='sm'
-                    variant='destructive'
-                    disabled={!isUserAdminOfPolicy(token.policy)}
-                    title={
-                      !isUserAdminOfPolicy(token.policy)
-                        ? 'Only policy admins can burn tokens'
-                        : undefined
-                    }
-                  >
-                    <Flame className='mr-2 h-4 w-4' />
-                    Burn
-                  </Button>
-                  {!isUserAdminOfPolicy(token.policy) && (
-                    <div className='absolute -bottom-5 left-0 right-0'>
-                      <p className='text-xs text-muted-foreground text-center'>
-                        Admin only
-                      </p>
-                    </div>
-                  )}
-                </div>
+                    >
+                      <Flame className='mr-2 h-4 w-4' />
+                      Burn
+                    </Button>
+                    {!isUserAdminOfPolicy(token.policy) && (
+                      <div className='absolute right-0 -bottom-5 left-0'>
+                        <p className='text-muted-foreground text-center text-xs'>
+                          Admin only
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -263,7 +272,7 @@ function TokensOverview() {
           if (!open) setSelectedToken(null);
         }}
         token={selectedToken}
-        onTransfer={async (recipientAddress, amount) => {
+        onTransfer={async (recipients) => {
           if (!selectedToken || !wallet || !address) return;
 
           setTransferLoading(true);
@@ -273,7 +282,9 @@ function TokensOverview() {
             // Select UTxO(s) to use
             const selectedUtxos = fluidMesh.selectUtxoForTransfer(
               selectedToken.utxos,
-              amount
+              recipients
+                .reduce((sum, r) => sum + BigInt(r.amount), BigInt(0))
+                .toString()
             );
 
             if (!selectedUtxos) {
@@ -310,8 +321,7 @@ function TokensOverview() {
             const result = await fluidMesh.transferCIP113Tokens(
               wallet,
               policyData,
-              recipientAddress,
-              amount,
+              recipients,
               selectedUtxos.utxos,
               selectedUtxos.balance
             );
@@ -321,7 +331,9 @@ function TokensOverview() {
               return;
             }
 
-            toast.success(`Transfer successful! TxHash: ${result.data?.txHash}`);
+            toast.success(
+              `Transfer successful! TxHash: ${result.data?.txHash}`
+            );
             setModalOpen(false);
 
             // Refresh tokens
